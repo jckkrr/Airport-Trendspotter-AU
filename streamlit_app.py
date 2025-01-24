@@ -7,7 +7,6 @@
 
 ### --------------------------------------- IMPORTS 
 
-from bs4 import BeautifulSoup, Tag
 import datetime
 import json
 import math
