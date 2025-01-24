@@ -91,6 +91,8 @@ st.write('Uncover trends in aviation data.')
 ### !!! Need to make load directly
 uploaded_file = st.file_uploader("Upload file here &#x2935;", type={"csv"})
 
+uploaded_file = pd.read_csv('latest_data.csv')
+
 if  uploaded_file:
 
     df = pd.read_csv(uploaded_file)
