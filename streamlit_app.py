@@ -90,7 +90,7 @@ st.write('Uncover trends in aviation data.')
 
 import os
 c = os.getcwd() 
-print(c)
+st.write(c)
 
 ### !!! Need to make load directly
 uploaded_file = st.file_uploader("Upload file here &#x2935;", type={"csv"})
