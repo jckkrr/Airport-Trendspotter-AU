@@ -155,7 +155,7 @@ def plotData(airport, icao, bool_normalise, bool_daily, bool_monthly):
     customChartDefaultStyling.styling(fig)
     fig.update_layout(height=500, width=1200)
     norm_text = '' if bool_normalise == False else ' (normalised)'
-    fig.update_layout(title=dict(text=f"<b>{returned_airport} ({icao})</b> | Total airport traffic per month (and day){norm_text}"))
+    fig.update_layout(title=dict(text=f"<b>{airport} ({icao})</b><br><sup>Total airport traffic per month/day</sup>{norm_text}"))
     fig.update_layout(xaxis=dict(title=dict(text=None)))
     fig.update_layout(yaxis=dict(title=dict(text=f"Departures + Arrivals{norm_text}")))
 
@@ -197,6 +197,54 @@ latest_data = 'https://raw.githubusercontent.com/jckkrr/Airport-Trendspotter-AU/
 df = pd.read_csv(latest_data)
 df.insert(2, 'month', df['timecode'].apply(lambda x: datetime.datetime.utcfromtimestamp(x).strftime('%Y-%m')))
 
+
+###
+
+st.write('')
+
+col1, col2, col3 = st.columns(3)
+chosen_states = []
+with col1:
+    
+    select_ascending_dict = {
+        'the most difference': False,
+        'the least difference': True
+    }
+    
+    selected_ascending = st.radio(
+        "Show me the airport(s) with...",
+        select_ascending_dict.keys(),
+    )
+    selected_ascending = select_ascending_dict[selected_ascending]
+
+with col2:
+    
+    selectable_columns_dict = {
+        'high/low points': 'diff_minmax',
+        'start/end points': 'diff_period',
+    }
+    
+    selected_column = st.radio(
+        "between its...",
+        selectable_columns_dict.keys(),
+    )
+    selected_column = selectable_columns_dict[selected_column]
+
+
+with col3:
+    
+    selectable_rawperc_dict = {
+        'in raw numbers': '',
+        'percentagised': '_%',
+    }
+    selected_rawperc = st.radio(
+        "when the data is...",
+        selectable_rawperc_dict.keys(),
+    )
+    selected_rawperc = selectable_rawperc_dict[selected_rawperc]
+    selected_column = selected_column + selected_rawperc
+
+### Period
 months = list(df.month.unique())
 month_names = {'01': 'January', '02': 'Febuary', '03': 'March', '04': 'April', '05': 'May', '06': 'June', '07': 'July', '08': 'August', '09': 'September', '10': 'October', '11': 'November', '12': 'December'}
 col1, col2 = st.columns(2)
@@ -212,26 +260,8 @@ if start_month > end_month:
     st.write("You can't start after you end.")
 df = df.loc[(df['month'] >= start_month) & (df
                                             ['month'] <= end_month)]
-st.write(f'This analysis for the period {start_month_name} {start_month_year} to {end_month_name} {end_month_year} inclusive.')
 
-
-###
-
-df_month = df.groupby(['ICAO', 'month'])['total_traffic'].sum().to_frame().reset_index()
-dfx = df_month.groupby(['ICAO'])['total_traffic'].max().to_frame().rename(columns = {'total_traffic': 'max_icao'})
-df_month = df_month.merge(dfx, on = 'ICAO', how = 'outer')
-df_month['normalised_traffic'] = df_month['total_traffic'] / df_month['max_icao']
-df_month = df_month.drop(['max_icao'], axis=1)
-df_month.tail()
-
-df_describe = make_describe(df_month)
-
-##
-
-alltime_values = df_describe['alltime_traffic'].values
-lo, hi = int(alltime_values.min()), int(alltime_values.max())
-alltime_range = st.slider("Assessing airports with total aircraft traffic for the period between:", lo, hi, (lo, hi))
-
+### States
 st.write('States:')
 col1, col2 = st.columns(2)
 chosen_states = []
@@ -250,39 +280,52 @@ with col2:
             chosen_states.append(state)    
 
 st.write()
-            
+
+### Size
+df_month = df.groupby(['ICAO', 'month'])['total_traffic'].sum().to_frame().reset_index()
+dfx = df_month.groupby(['ICAO'])['total_traffic'].max().to_frame().rename(columns = {'total_traffic': 'max_icao'})
+df_month = df_month.merge(dfx, on = 'ICAO', how = 'outer')
+df_month['normalised_traffic'] = df_month['total_traffic'] / df_month['max_icao']
+df_month = df_month.drop(['max_icao'], axis=1)
+df_month.tail()
+
+df_describe = make_describe(df_month)
+alltime_values = df_describe['alltime_traffic'].values
+lo, hi = int(alltime_values.min()), int(alltime_values.max())
+alltime_range = st.slider("Assessing airports with total aircraft traffic for the period between:", lo, hi, (lo, hi))  
+
 df_describe = df_describe.sort_values(by = ['max'], ascending = False)
 df_describe = df_describe.loc[(df_describe['alltime_traffic'] >= alltime_range[0]) & (df_describe['alltime_traffic'] <= alltime_range[1])]
 df_describe = df_describe[df_describe.index.get_level_values('state').isin(chosen_states)]
 
 
-
+### 
 
 def print_analysis(col, bool_ascending, descriptor):
-    dfx = df_describe.sort_values(by = col, ascending = bool_ascending)[0:3]
-    returned_airport = dfx.index[0][1]
-    returned_icao = dfx.index[0][0]
-    st.write(f'\nThe airport with the {descriptor} in that period was {returned_airport} ({returned_icao}), with {dfx.iloc[0][col]}')
-    st.dataframe(dfx[[col]])
+  
+    dfx = df_describe.sort_values(by = col, ascending = bool_ascending)[0:10]
     
-    return returned_airport, returned_icao
-
-st.write('')
-col1, col2 = st.columns(2)
-with col1:
-    selectable_columns = ['alltime_traffic', 'min', 'max', 'diff_minmax', 'diff_minmax_%', 'start_month_traffic', 'end_month_traffic', 'diff_period', 'diff_period_%']
-    selected_column = st.selectbox('Select column to assess', (selectable_columns))
-
-with col2:
-    select_ascending = [False, True]
-    selected_ascending = st.selectbox('From low to high?', (select_ascending))
+    returned_icaos = [x[0] for x in dfx.index]
+    returned_airports = [x[1] for x in dfx.index]    
+    returned_dict = dict(zip(returned_airports, returned_icaos))
     
-st.write(' ')
-returned_airport, returned_icao = print_analysis(selected_column, selected_ascending, f'most/least {selected_column}')
+    st.write('')
+    st.write('')
+    st.write('')
+    st.markdown(f'<p class="mid-font">*** RESULTS ***</p>', unsafe_allow_html=True)
+    selected_airport = st.selectbox('', (returned_dict.keys()))    
+    selected_icao = returned_dict[selected_airport]
+    
+    ### PLOT
+    plotData(selected_airport, selected_icao, False, True, True)
+    
+    st.dataframe(dfx[[col]], width=800)
+        
+print_analysis(selected_column, selected_ascending, '################################')
 
-plotData(returned_airport, returned_icao, False, True, True)
 
+### FORMAT
 st.markdown("""<style>.small-font {font-size:8px !important; padding: 0; margin: 0; line-height: 6px;}</style>""", unsafe_allow_html=True)
-st.markdown(f'<p class="small-font">(Note: ....)</p>', unsafe_allow_html=True)
-
+st.markdown("""<style>.mid-font {font-size:20px !important; font-weight: bold; padding: 0; margin: 0; line-height: 6px;}</style>""", unsafe_allow_html=True)
+st.markdown(f'<p class="small-font">...</p>', unsafe_allow_html=True)
 st.write('---')
